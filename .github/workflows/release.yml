@@ -1,0 +1,47 @@
+# Pushing a tag like v1.0.0 builds the Music app with the release key and publishes it, with the
+# install scripts, as a GitHub release.
+# Repository secrets it needs:
+#   RELEASE_KEYSTORE_B64   the release .jks, base64-encoded
+#   RELEASE_KEYSTORE_PASS  its password
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Android SDK packages
+        shell: pwsh
+        run: |
+          $sdkmanager = "$env:ANDROID_HOME\cmdline-tools\latest\bin\sdkmanager.bat"
+          @('y') * 20 | & $sdkmanager 'build-tools;36.0.0' 'platforms;android-36.1' | Out-Null
+          if ($LASTEXITCODE) { throw 'sdkmanager failed' }
+
+      - name: Build
+        shell: pwsh
+        env:
+          RELEASE_KEYSTORE_B64: ${{ secrets.RELEASE_KEYSTORE_B64 }}
+          RELEASE_KEYSTORE_PASS: ${{ secrets.RELEASE_KEYSTORE_PASS }}
+        run: |
+          $env:RELEASE_KEYSTORE = "$env:RUNNER_TEMP\release.jks"
+          [IO.File]::WriteAllBytes($env:RELEASE_KEYSTORE, [Convert]::FromBase64String($env:RELEASE_KEYSTORE_B64))
+          & .\release.ps1
+
+      - name: Publish
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create $env:GITHUB_REF_NAME (Get-ChildItem dist).FullName --title $env:GITHUB_REF_NAME --generate-notes

@@ -1,0 +1,21 @@
+# Build output
+build/
+dist/
+*.apk
+*.idsig
+
+# Signing keys: never commit these
+*.jks
+*.keystore
+*password*.txt
+
+# Downloaded by install.ps1 / install.sh
+platform-tools/
+
+# The iPhone bridge app: not published yet
+ancs-bridge/
+
+# Personal working notes (watch IP, serial, Wi-Fi, music); README.md is the public doc
+CLAUDE.md
+PROGRESS.md
+.claude/

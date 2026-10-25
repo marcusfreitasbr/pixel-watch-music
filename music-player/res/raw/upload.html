@@ -1,0 +1,581 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Watch Music</title>
+<style>
+  :root {
+    --bg: #000; --card: #1c1c1e; --fill: #2c2c2e; --line: #38383a;
+    --label: #fff; --secondary: #8e8e93; --pink: #ff2d55; --green: #34c759; --red: #ff3b30;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--label);
+    font: 15px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  main { max-width: 600px; margin: 0 auto; padding: 32px 16px 80px; }
+  h1 { font-size: 28px; font-weight: 700; margin: 0; letter-spacing: -.01em; }
+  .sub, .muted { color: var(--secondary); }
+  .muted { font-size: 13px; }
+  .card { background: var(--card); border-radius: 18px; }
+  button {
+    font: inherit; font-weight: 600; color: var(--label); background: var(--fill);
+    border: 0; border-radius: 999px; padding: 11px 20px; cursor: pointer;
+    transition: transform .1s, background .15s;
+  }
+  button:active { transform: scale(.96); }
+  button.primary { background: var(--pink); }
+  svg.icon { width: 24px; height: 24px; fill: currentColor; display: block; }
+  .name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .grow { flex: 1; min-width: 0; }
+  [hidden] { display: none !important; }
+
+  /* --- Code screen --- */
+  #login {
+    min-height: calc(100vh - 112px); display: flex; flex-direction: column;
+    align-items: center; justify-content: center; text-align: center;
+  }
+  #login .watch { width: 84px; height: 84px; margin-bottom: 18px; }
+  #login h1 { font-size: 26px; }
+  #login .lead { color: var(--secondary); max-width: 300px; margin: 8px auto 28px; }
+  #login .lead b { color: var(--label); font-weight: 600; }
+  .digits { display: flex; gap: 10px; justify-content: center; }
+  .digits input {
+    width: 56px; height: 68px; padding: 0; text-align: center;
+    font-family: inherit; font-size: 32px; font-weight: 600; color: var(--label); caret-color: var(--pink);
+    background: var(--card); border: 2px solid var(--line); border-radius: 14px; outline: none;
+    transition: border-color .15s, background .15s;
+  }
+  .digits input:focus { border-color: var(--pink); background: #232325; }
+  .digits.wrong input { border-color: var(--red); }
+  .digits.wrong { animation: shake .4s; }
+  @keyframes shake {
+    20%, 60% { transform: translateX(-8px); }
+    40%, 80% { transform: translateX(8px); }
+  }
+  #error { color: var(--red); min-height: 2.8em; max-width: 320px; margin: 14px auto 6px; font-size: 14px; }
+  #go { min-width: 200px; padding: 13px 18px; }
+  #go:disabled { background: var(--fill); color: var(--secondary); cursor: default; transform: none; }
+  #login .help { color: var(--secondary); font-size: 13px; margin-top: 22px; max-width: 320px; }
+
+  /* --- Header: who we're talking to and how full it is --- */
+  #top { display: flex; align-items: center; gap: 14px; margin-bottom: 22px; }
+  #top .watch { width: 52px; height: 52px; flex: none; }
+  .storage { margin-top: 8px; }
+  .meter { height: 6px; background: var(--fill); border-radius: 3px; overflow: hidden; }
+  .meter div { height: 100%; background: var(--pink); border-radius: 3px; transition: width .4s; }
+  .storage .muted { margin-top: 5px; }
+
+  /* --- Drop area --- */
+  .drop {
+    border: 2px dashed var(--line); border-radius: 18px; padding: 30px 20px 26px; text-align: center;
+    background: var(--card); transition: border-color .15s, background .15s, transform .15s;
+  }
+  .drop.over { border-color: var(--pink); background: #2a1419; transform: scale(1.01); }
+  .badge {
+    width: 56px; height: 56px; border-radius: 50%; margin: 0 auto 14px;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(255, 45, 85, .15); color: var(--pink);
+  }
+  .badge svg.icon { width: 28px; height: 28px; }
+  .drop h2 { font-size: 19px; font-weight: 600; margin: 0 0 4px; }
+  .drop .buttons { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 20px; }
+
+  /* --- Section headings --- */
+  .section { display: flex; align-items: baseline; gap: 10px; margin: 34px 4px 10px; }
+  .section h2 { font-size: 20px; font-weight: 700; margin: 0; flex: 1; }
+  .section button { padding: 6px 14px; font-size: 14px; }
+
+  /* --- Lists (upload queue, albums) --- */
+  ul { list-style: none; margin: 0; padding: 6px 0; }
+  li { display: flex; align-items: center; gap: 12px; padding: 10px 16px; position: relative; }
+  li + li::before {
+    content: ""; position: absolute; top: 0; right: 0; left: 64px; border-top: 1px solid var(--line);
+  }
+  .tile {
+    width: 36px; height: 36px; border-radius: 9px; flex: none; background: var(--fill); color: var(--secondary);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .tile svg.icon { width: 20px; height: 20px; }
+  .album .tile { width: 48px; height: 48px; border-radius: 10px; color: #fff; font-size: 20px; font-weight: 700; }
+  .album + .album::before { left: 76px; }
+  .album.going { opacity: .35; transition: opacity .3s; }
+  .empty { padding: 26px 16px; text-align: center; color: var(--secondary); }
+
+  /* Upload rows */
+  .bar { height: 4px; background: var(--fill); border-radius: 2px; margin-top: 7px; overflow: hidden; }
+  .bar div { height: 100%; width: 0; background: var(--pink); border-radius: 2px; transition: width .2s; }
+  .state { font-size: 13px; color: var(--secondary); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .done .tile { background: rgba(52, 199, 89, .15); color: var(--green); }
+  .done .bar div { background: var(--green); }
+  .done .state { color: var(--green); }
+  .failed .tile { background: rgba(255, 59, 48, .15); color: var(--red); }
+  .failed .state { color: var(--red); white-space: normal; text-align: right; max-width: 40%; }
+  .overall { padding: 14px 16px 4px; }
+  .overall .row { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; color: var(--secondary); }
+  .overall .row b { color: var(--label); font-weight: 600; }
+  .overall .bar { height: 6px; border-radius: 3px; margin: 8px 0 0; }
+
+  /* Delete: tap the bin, then confirm on the red pill */
+  .bin { background: none; color: var(--secondary); padding: 8px; border-radius: 50%; }
+  .bin:hover { color: var(--red); background: rgba(255, 59, 48, .12); }
+  .bin.armed { background: var(--red); color: #fff; border-radius: 999px; padding: 7px 14px; font-size: 14px; }
+
+  /* Toast */
+  #toast {
+    position: fixed; left: 50%; bottom: 28px; transform: translate(-50%, 20px); opacity: 0;
+    background: #2c2c2e; color: var(--label); padding: 12px 18px; border-radius: 14px; max-width: calc(100% - 32px);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, .6); font-size: 14px; text-align: center;
+    transition: opacity .2s, transform .2s; pointer-events: none;
+  }
+  #toast.show { opacity: 1; transform: translate(-50%, 0); }
+</style>
+</head>
+<body>
+<svg style="display:none" aria-hidden="true">
+  <symbol id="watch" viewBox="0 0 84 84">
+    <rect x="28" y="2" width="28" height="24" rx="7" fill="#2c2c2e"/>
+    <rect x="28" y="58" width="28" height="24" rx="7" fill="#2c2c2e"/>
+    <rect x="66" y="36" width="6" height="12" rx="3" fill="#48484a"/>
+    <circle cx="42" cy="42" r="26" fill="#000" stroke="#48484a" stroke-width="4"/>
+    <path transform="translate(30 30)" fill="#ff2d55"
+      d="M12,3v10.55c-0.59,-0.34 -1.27,-0.55 -2,-0.55 -2.21,0 -4,1.79 -4,4s1.79,4 4,4 4,-1.79 4,-4V7h4V3h-6z"/>
+  </symbol>
+  <symbol id="note" viewBox="0 0 24 24"><path d="M12,3v10.55c-0.59,-0.34 -1.27,-0.55 -2,-0.55 -2.21,0 -4,1.79 -4,4s1.79,4 4,4 4,-1.79 4,-4V7h4V3h-6z"/></symbol>
+  <symbol id="upload" viewBox="0 0 24 24"><path d="M9,16h6v-6h4l-7,-7 -7,7h4zM5,18h14v2H5z"/></symbol>
+  <symbol id="check" viewBox="0 0 24 24"><path d="M9,16.17L4.83,12l-1.42,1.41L9,19 21,7l-1.41,-1.41z"/></symbol>
+  <symbol id="alert" viewBox="0 0 24 24"><path d="M11,15h2v2h-2zM11,7h2v6h-2zM12,2C6.48,2 2,6.48 2,12s4.48,10 10,10 10,-4.48 10,-10S17.52,2 12,2zM12,20c-4.41,0 -8,-3.59 -8,-8s3.59,-8 8,-8 8,3.59 8,8 -3.59,8 -8,8z"/></symbol>
+  <symbol id="bin" viewBox="0 0 24 24"><path d="M6,19c0,1.1 0.9,2 2,2h8c1.1,0 2,-0.9 2,-2V7H6v12zM8,9h8v10H8V9zM15.5,4l-1,-1h-5l-1,1H5v2h14V4z"/></symbol>
+</svg>
+
+<main>
+  <header id="top" hidden>
+    <svg class="watch"><use href="#watch"/></svg>
+    <div class="grow">
+      <h1>Watch Music</h1>
+      <div class="storage">
+        <div class="meter"><div id="used" style="width:0"></div></div>
+        <div class="muted" id="free">&nbsp;</div>
+      </div>
+    </div>
+  </header>
+
+  <section id="login" hidden>
+    <svg class="watch"><use href="#watch"/></svg>
+    <h1>Connect to your watch</h1>
+    <p class="lead">On the watch, open <b>Music&nbsp;›&nbsp;Add&nbsp;Music</b> and enter the code it shows.</p>
+    <form class="digits" id="digits" autocomplete="off">
+      <input inputmode="numeric" pattern="[0-9]*" maxlength="1" aria-label="Digit 1" autocomplete="one-time-code">
+      <input inputmode="numeric" pattern="[0-9]*" maxlength="1" aria-label="Digit 2">
+      <input inputmode="numeric" pattern="[0-9]*" maxlength="1" aria-label="Digit 3">
+      <input inputmode="numeric" pattern="[0-9]*" maxlength="1" aria-label="Digit 4">
+    </form>
+    <p id="error" role="alert"></p>
+    <button class="primary" id="go" disabled>Connect</button>
+    <p class="help">The code changes each time Add Music is opened, and the page only works while that screen is on.</p>
+  </section>
+
+  <section id="app" hidden>
+    <div class="drop" id="drop">
+      <div class="badge"><svg class="icon"><use href="#upload"/></svg></div>
+      <h2 id="dropTitle">Drop songs or album folders</h2>
+      <div class="muted">MP3 · M4A · FLAC · AAC · OGG · Opus · WAV</div>
+      <div class="buttons">
+        <button class="primary" id="pickFiles">Choose songs</button>
+        <button id="pickFolder">Choose a folder</button>
+      </div>
+      <input type="file" id="files" multiple accept="audio/*,.flac,.m4a,.opus,.ogg" hidden>
+      <input type="file" id="folder" webkitdirectory hidden>
+    </div>
+
+    <div id="queueBox" hidden>
+      <div class="section"><h2 id="queueTitle">Uploading</h2><button id="clear" hidden>Clear</button></div>
+      <div class="card">
+        <div class="overall">
+          <div class="row"><b id="overallLeft"></b><span id="overallRight"></span></div>
+          <div class="bar"><div id="overallBar"></div></div>
+        </div>
+        <ul id="queue"></ul>
+      </div>
+    </div>
+
+    <div class="section"><h2>On the watch</h2><span class="muted" id="libraryCount"></span></div>
+    <div class="card"><ul id="library"><li class="empty">Loading…</li></ul></div>
+  </section>
+</main>
+<div id="toast" role="status"></div>
+
+<script>
+const AUDIO = /\.(mp3|m4a|aac|flac|ogg|opus|wav)$/i;
+const $ = id => document.getElementById(id);
+const icon = name => `<svg class="icon"><use href="#${name}"/></svg>`;
+let code = '';
+try { code = sessionStorage.getItem('code') || ''; } catch (e) {}
+
+function api(method, path, body) {
+  return fetch(path, { method, body, headers: { 'X-Code': code } }).then(async r => {
+    const json = await r.json().catch(() => ({}));
+    if ((r.status === 403 || r.status === 429) && !$('app').hidden) codeChanged();
+    if (!r.ok) throw Object.assign(new Error(json.error || r.statusText), { status: r.status });
+    return json;
+  });
+}
+
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+}
+
+function size(bytes) {
+  return bytes >= 1e9 ? (bytes / 1e9).toFixed(1) + ' GB' : Math.max(1, Math.round(bytes / 1e6)) + ' MB';
+}
+
+function length(ms) {
+  const min = Math.round(ms / 60000);
+  return min >= 60 ? Math.floor(min / 60) + ' h ' + (min % 60) + ' min' : min + ' min';
+}
+
+const plural = (n, word) => n + ' ' + word + (n === 1 ? '' : 's');
+
+let toastTimer;
+function toast(msg) {
+  const t = $('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 3500);
+}
+
+// --- Connecting ---
+
+const boxes = [...document.querySelectorAll('#digits input')];
+const typed = () => boxes.map(b => b.value).join('');
+
+function showLogin() {
+  $('app').hidden = true;
+  $('top').hidden = true;
+  $('login').hidden = false;
+  $('go').textContent = 'Connect';
+}
+
+async function connect() {
+  $('go').disabled = true;
+  $('go').textContent = 'Connecting…';
+  try {
+    await loadLibrary();
+    try { sessionStorage.setItem('code', code); } catch (e) {}
+    $('login').hidden = true;
+    $('top').hidden = false;
+    $('app').hidden = false;
+    if (queue.length && !busy) next(); // resume uploads paused by a code change
+  } catch (e) {
+    const wasTyped = typed().length === 4;
+    showLogin();
+    if (e.status === 429) { // too many wrong codes: the server says how long to wait
+      $('error').textContent = e.message;
+      wrong();
+    } else if (e.status === 403) {
+      // A code saved from an earlier session failing just means the watch has a new one: no error for that.
+      $('error').textContent = wasTyped ? 'That code didn’t match. Check the watch and try again.' : '';
+      if (wasTyped) wrong();
+    } else {
+      $('error').textContent = 'Can’t reach the watch. Make sure Add Music is open on it and you’re on the same Wi-Fi.';
+      $('go').disabled = typed().length !== 4;
+    }
+    if (!wasTyped) boxes[0].focus();
+  }
+}
+
+/** Add Music was reopened on the watch, so it has a new code. */
+function codeChanged() {
+  showLogin();
+  boxes.forEach(b => b.value = '');
+  $('go').disabled = true;
+  $('error').textContent = 'The watch has a new code. Enter it to carry on.';
+  boxes[0].focus();
+}
+
+function wrong() {
+  const d = $('digits');
+  d.classList.remove('wrong');
+  void d.offsetWidth; // restart the shake
+  d.classList.add('wrong');
+  setTimeout(() => {
+    d.classList.remove('wrong');
+    boxes.forEach(b => b.value = '');
+    boxes[0].focus();
+    $('go').disabled = true;
+  }, 600);
+}
+
+function submit() {
+  if (typed().length !== 4) return;
+  code = typed();
+  connect();
+}
+
+// One digit per box: typing moves on, Backspace moves back, pasting fills them all, the fourth digit submits.
+boxes.forEach((box, i) => {
+  box.oninput = () => {
+    const digits = box.value.replace(/\D/g, '');
+    if (digits.length > 1) return fill(digits); // autofill or a fast paste into one box
+    box.value = digits;
+    $('error').textContent = '';
+    $('go').disabled = typed().length !== 4;
+    if (digits && i < 3) boxes[i + 1].focus();
+    if (typed().length === 4) submit();
+  };
+  box.onkeydown = e => {
+    if (e.key === 'Backspace' && !box.value && i > 0) { boxes[i - 1].value = ''; boxes[i - 1].focus(); e.preventDefault(); }
+    else if (e.key === 'ArrowLeft' && i > 0) boxes[i - 1].focus();
+    else if (e.key === 'ArrowRight' && i < 3) boxes[i + 1].focus();
+    else if (e.key === 'Enter') submit();
+  };
+  box.onfocus = () => box.select();
+  box.onpaste = e => { e.preventDefault(); fill((e.clipboardData.getData('text') || '').replace(/\D/g, '')); };
+});
+
+function fill(digits) {
+  boxes.forEach((b, i) => b.value = digits[i] || '');
+  boxes[Math.min(digits.length, 3)].focus();
+  $('go').disabled = typed().length !== 4;
+  if (typed().length === 4) submit();
+}
+
+$('digits').onsubmit = e => { e.preventDefault(); submit(); };
+$('go').onclick = submit;
+
+// --- Library ---
+
+/** A colour per album, so the list reads like album art at a glance. */
+function tileColour(name) {
+  let h = 0;
+  for (const c of name) h = (h * 31 + c.codePointAt(0)) % 360;
+  return `linear-gradient(135deg, hsl(${h} 75% 58%), hsl(${(h + 40) % 360} 70% 38%))`;
+}
+
+async function loadLibrary() {
+  const data = await api('GET', '/api/songs');
+  const used = data.total ? (data.total - data.free) / data.total : 0;
+  $('used').style.width = (100 * used).toFixed(1) + '%';
+  $('free').textContent = size(data.free) + ' free of ' + size(data.total);
+
+  const albums = new Map();
+  for (const s of data.songs) {
+    const key = s.artist + '\u0000' + s.album;
+    if (!albums.has(key)) albums.set(key, { artist: s.artist, album: s.album, songs: [], ms: 0 });
+    const a = albums.get(key);
+    a.songs.push(s);
+    a.ms += s.duration;
+  }
+  const totalMs = data.songs.reduce((t, s) => t + s.duration, 0);
+  $('libraryCount').textContent = data.songs.length ? plural(data.songs.length, 'song') + ' · ' + length(totalMs) : '';
+
+  const list = $('library');
+  list.innerHTML = '';
+  if (!albums.size) list.innerHTML = '<li class="empty">No music yet. Add some above.</li>';
+  for (const a of albums.values()) {
+    const li = document.createElement('li');
+    li.className = 'album';
+    li.innerHTML = `<div class="tile" style="background:${tileColour(a.album)}">${esc([...a.album][0] || '♪')}</div>
+      <div class="grow"><div class="name">${esc(a.album)}</div>
+      <div class="muted name">${esc(a.artist)} · ${plural(a.songs.length, 'song')} · ${length(a.ms)}</div></div>
+      <button class="bin" title="Delete from the watch">${icon('bin')}</button>`;
+    armDelete(li.querySelector('.bin'), li, a);
+    list.appendChild(li);
+  }
+}
+
+// First tap on the bin turns it into a red "Delete" pill; a second tap within 3 s deletes.
+function armDelete(bin, li, a) {
+  let timer;
+  bin.onclick = async () => {
+    if (!bin.classList.contains('armed')) {
+      bin.classList.add('armed');
+      bin.textContent = 'Delete';
+      timer = setTimeout(() => { bin.classList.remove('armed'); bin.innerHTML = icon('bin'); }, 3000);
+      return;
+    }
+    clearTimeout(timer);
+    li.classList.add('going');
+    try {
+      const r = await api('POST', '/api/delete', a.songs.map(s => s.id).join(','));
+      if (r.confirm) toast('Confirm the deletion on the watch.');
+      else toast('Deleted “' + a.album + '”.');
+      setTimeout(loadLibrary, r.confirm ? 6000 : 300);
+    } catch (e) {
+      li.classList.remove('going');
+      toast('Couldn’t delete: ' + e.message);
+    }
+  };
+}
+
+// --- Choosing files ---
+
+const touch = matchMedia('(hover: none)').matches;
+if (touch) {
+  $('dropTitle').textContent = 'Add songs to the watch';
+  $('pickFolder').hidden = true; // phones can't pick folders
+}
+$('pickFiles').onclick = () => $('files').click();
+$('pickFolder').onclick = () => $('folder').click();
+$('files').onchange = e => { add([...e.target.files].map(f => ({ file: f, path: f.name }))); e.target.value = ''; };
+$('folder').onchange = e => { add([...e.target.files].map(f => ({ file: f, path: f.webkitRelativePath || f.name }))); e.target.value = ''; };
+
+const drop = $('drop');
+drop.ondragover = e => { e.preventDefault(); drop.classList.add('over'); };
+drop.ondragleave = () => drop.classList.remove('over');
+drop.ondrop = async e => {
+  e.preventDefault();
+  drop.classList.remove('over');
+  const entries = [...e.dataTransfer.items].map(i => i.webkitGetAsEntry && i.webkitGetAsEntry()).filter(Boolean);
+  if (!entries.length) return add([...e.dataTransfer.files].map(f => ({ file: f, path: f.name })));
+  const found = [];
+  for (const entry of entries) await walk(entry, found);
+  add(found);
+};
+
+// Reads a dropped folder recursively, keeping each file's path (e.g. "Album/01 Song.flac").
+async function walk(entry, out) {
+  if (entry.isFile) {
+    const file = await new Promise((ok, fail) => entry.file(ok, fail));
+    out.push({ file, path: entry.fullPath.replace(/^\//, '') });
+  } else if (entry.isDirectory) {
+    const reader = entry.createReader();
+    for (;;) {
+      const batch = await new Promise((ok, fail) => reader.readEntries(ok, fail));
+      if (!batch.length) break;
+      for (const child of batch) await walk(child, out);
+    }
+  }
+}
+
+// --- Uploading, one song at a time ---
+
+const queue = [];
+let busy = false;
+const batch = { count: 0, done: 0, bytes: 0, sent: 0, added: 0, skipped: 0, failed: 0, start: 0 };
+
+function add(items) {
+  const skipped = items.length;
+  items = items.filter(i => AUDIO.test(i.path)).sort((a, b) => a.path.localeCompare(b.path));
+  if (!items.length) return toast(skipped ? 'No music files there.' : 'Nothing to add.');
+  if (!busy) Object.assign(batch, { count: 0, done: 0, bytes: 0, sent: 0, added: 0, skipped: 0, failed: 0, start: Date.now() });
+  $('queueBox').hidden = false;
+  $('clear').hidden = true;
+  for (const item of items) {
+    const parts = item.path.split('/');
+    const li = document.createElement('li');
+    li.innerHTML = `<div class="tile">${icon('note')}</div>
+      <div class="grow"><div class="name">${esc(parts.pop())}</div>
+      <div class="muted name">${esc(parts.join(' / ') || size(item.file.size))}</div>
+      <div class="bar"><div></div></div></div>
+      <div class="state">Waiting</div>`;
+    $('queue').appendChild(li);
+    queue.push(Object.assign(item, { li }));
+    batch.count++;
+    batch.bytes += item.file.size;
+  }
+  showOverall();
+  if (!busy) next();
+}
+
+function showOverall(current = 0) {
+  const sent = batch.sent + current;
+  const secs = Math.max(.001, (Date.now() - batch.start) / 1000);
+  const speed = sent / 1e6 / secs;
+  $('overallBar').style.width = batch.bytes ? (100 * sent / batch.bytes) + '%' : '0';
+  if (busy || queue.length) {
+    $('queueTitle').textContent = 'Uploading';
+    $('overallLeft').textContent = Math.min(batch.done + 1, batch.count) + ' of ' + batch.count;
+    $('overallRight').textContent = size(Math.max(0, batch.bytes - sent)) + ' left' + (sent ? ' · ' + speed.toFixed(1) + ' MB/s' : '');
+  } else {
+    const bits = [];
+    if (batch.added) bits.push(batch.added + ' added');
+    if (batch.skipped) bits.push(batch.skipped + ' already there');
+    if (batch.failed) bits.push(batch.failed + ' failed');
+    $('queueTitle').textContent = batch.failed ? 'Finished with problems' : 'All done';
+    $('overallLeft').textContent = bits.join(' · ');
+    $('overallRight').textContent = size(batch.sent) + ' in ' + Math.round(secs) + ' s';
+  }
+}
+
+function mark(item, cls, text, iconName) {
+  item.li.className = cls;
+  item.li.querySelector('.state').textContent = text;
+  item.li.querySelector('.tile').innerHTML = icon(iconName);
+  if (cls === 'done') item.li.querySelector('.bar div').style.width = '100%';
+}
+
+async function next() {
+  const item = queue.shift();
+  if (!item) {
+    busy = false;
+    showOverall();
+    $('clear').hidden = false;
+    loadLibrary().catch(() => {});
+    return;
+  }
+  busy = true;
+  showOverall();
+  item.li.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  const path = encodeURIComponent(item.path);
+  try {
+    if ((await api('GET', '/api/has?path=' + path)).has) {
+      batch.skipped++;
+      mark(item, 'done', 'Already there', 'check');
+    } else {
+      await send(item, path);
+      batch.added++;
+      mark(item, 'done', 'Added', 'check');
+    }
+  } catch (e) {
+    if (e.status === 403 || e.status === 429) { // new code on the watch: pause here, carry on after reconnecting
+      item.li.querySelector('.state').textContent = 'Waiting';
+      item.li.querySelector('.bar div').style.width = '0';
+      queue.unshift(item);
+      busy = false;
+      return;
+    }
+    batch.failed++;
+    mark(item, 'failed', e.message || 'Failed', 'alert');
+  }
+  batch.done++;
+  batch.sent += item.file.size;
+  next();
+}
+
+function send(item, path) {
+  return new Promise((ok, fail) => {
+    const xhr = new XMLHttpRequest(); // fetch() can't report upload progress
+    const bar = item.li.querySelector('.bar div');
+    const state = item.li.querySelector('.state');
+    xhr.open('POST', '/api/upload?path=' + path);
+    xhr.setRequestHeader('X-Code', code);
+    xhr.upload.onprogress = e => {
+      bar.style.width = (100 * e.loaded / e.total) + '%';
+      state.textContent = Math.round(100 * e.loaded / e.total) + '%';
+      showOverall(e.loaded);
+    };
+    xhr.onload = () => {
+      if (xhr.status === 200) return ok();
+      let msg = 'Failed';
+      try { msg = JSON.parse(xhr.responseText).error; } catch (e) {}
+      if (xhr.status === 403 || xhr.status === 429) codeChanged();
+      fail(Object.assign(new Error(msg), { status: xhr.status }));
+    };
+    xhr.onerror = () => fail(new Error('Connection lost'));
+    xhr.send(item.file);
+  });
+}
+
+$('clear').onclick = () => {
+  $('queue').innerHTML = '';
+  $('queueBox').hidden = true;
+};
+
+connect();
+</script>
+</body>
+</html>
